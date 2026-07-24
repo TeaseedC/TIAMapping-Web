@@ -5,18 +5,13 @@
 [在线访问](https://chacloud.github.io/TIAMapping-Web/)
 
 ## 本地运行
-任选其一:
 ```bash
-# Python
-python -m http.server 8000 --directory web
-# 然后浏览器打开 http://localhost:8000
-
 # Node
 npx serve web
 ```
 
 ## 功能
-- 解析 PLCTags.xlsx(Name/Path/Data Type/Logical Address/Comment)
+- 解析博图导出的PLC变量表文件 PLCTags.xlsx
 - 生成 DB 源文件(.db,非优化访问 + NON_RETAIN)
 - 生成 FB1 映射逻辑 SCL(.scl,逐位赋值)
 - M 点(%M)映射开关 + DB 内 M点结构体(输入/输出子结构)
