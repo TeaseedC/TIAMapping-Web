@@ -3,7 +3,7 @@
 纯前端静态网页版 IO 映射代码生成器。浏览器中解析 PLCTags.xlsx,生成可导入 TIA V18 的 DB/FB1 源文件。无后端,文件本地处理不上传。
 
 ## 在线访问
-部署到 GitHub Pages 后访问 `https://<用户名>.github.io/<仓库名>/`。
+访问 `https://chacloud.github.io/TIAMapping-Web/`。
 
 ## 本地运行
 任选其一:
