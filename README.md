@@ -1,9 +1,8 @@
-# TIA IO 映射生成器 // WEB
+[# TIA IO 映射生成器 // WEB
 
 纯前端静态网页版 IO 映射代码生成器。浏览器中解析 PLCTags.xlsx,生成可导入 TIA V18 的 DB/FB1 源文件。无后端,文件本地处理不上传。
 
-## 在线访问
-访问 `https://chacloud.github.io/TIAMapping-Web/`。
+[在线访问](https://chacloud.github.io/TIAMapping-Web/)
 
 ## 本地运行
 任选其一:
@@ -54,3 +53,4 @@ web/
 
 ## 设计
 工业硬核暗色风格:纯黑/深灰底 + 霓虹橙/金属银强调 + 网格纹理 + 等宽字体高密度布局。
+](https://chacloud.github.io/TIAMapping-Web/)
