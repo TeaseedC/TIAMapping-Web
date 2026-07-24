@@ -1,4 +1,4 @@
-[# TIA IO 映射生成器 // WEB
+# TIA IO 映射生成器 // WEB
 
 纯前端静态网页版 IO 映射代码生成器。浏览器中解析 PLCTags.xlsx,生成可导入 TIA V18 的 DB/FB1 源文件。无后端,文件本地处理不上传。
 
