@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TIA IO 映射生成器 // WEB</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@400;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="grid-overlay"></div>
+<div class="noise"></div>
+
+<!-- 顶部标题栏 -->
+<header class="topbar">
+    <div class="brand">
+        <span class="logo-mark">▣</span>
+        <div class="brand-text">
+            <h1>TIA<span class="accent">IO</span>MAPPER</h1>
+            <p class="sub">V18 // IO 映射代码生成器</p>
+        </div>
+    </div>
+    <div class="status">
+        <span class="led" id="statusLed"></span>
+        <span class="status-text" id="statusText">待机</span>
+    </div>
+</header>
+
+<main class="panel">
+
+    <!-- 文件选择 -->
+    <section class="block">
+        <div class="block-head"><span class="idx">01</span><h2>数据源</h2></div>
+        <div class="dropzone" id="dropzone">
+            <input type="file" id="fileInput" accept=".xlsx,.xls" hidden>
+            <div class="drop-inner">
+                <div class="drop-icon">▼</div>
+                <p class="drop-title">拖入 PLCTags.xlsx</p>
+                <p class="drop-hint">或点击选择文件</p>
+            </div>
+        </div>
+        <div class="file-info" id="fileInfo" hidden>
+            <span class="file-name" id="fileName"></span>
+            <span class="file-points" id="filePoints"></span>
+        </div>
+    </section>
+
+    <!-- 命名设置 -->
+    <section class="block">
+        <div class="block-head"><span class="idx">02</span><h2>命名</h2></div>
+        <div class="grid-2">
+            <label class="field">
+                <span>DB 块名</span>
+                <input type="text" id="dbName" value="IO映射" autocomplete="off">
+            </label>
+            <label class="field">
+                <span>映射 FB 名</span>
+                <input type="text" id="fbName" value="IO映射FB" autocomplete="off">
+            </label>
+        </div>
+    </section>
+
+    <!-- 生成选项 -->
+    <section class="block">
+        <div class="block-head"><span class="idx">03</span><h2>生成选项</h2></div>
+        <div class="checks">
+            <label class="chk"><input type="checkbox" id="genDb" checked><span class="box"></span>生成 DB</label>
+            <label class="chk"><input type="checkbox" id="genFb" checked><span class="box"></span>生成 FB1</label>
+            <label class="chk"><input type="checkbox" id="includeM"><span class="box"></span>包含 M 点(%M)</label>
+            <label class="chk"><input type="checkbox" id="pokeBlk"><span class="box"></span>启用 POKE_BLK</label>
+        </div>
+        <div class="poke-row" id="pokeRow">
+            <label class="field inline">
+                <span>POKE_BLK DB 编号</span>
+                <input type="text" id="dbNumber" value="100" autocomplete="off">
+            </label>
+            <p class="hint">POKE_BLK 需要数字 DB 号,在 TIA 项目属性中查看</p>
+        </div>
+    </section>
+
+    <!-- 高级设置 -->
+    <section class="block">
+        <div class="block-head"><span class="idx">04</span><h2>高级设置</h2></div>
+        <label class="chk toggle">
+            <input type="checkbox" id="advEnabled"><span class="box"></span>启用高级设置(选择映射点位)
+        </label>
+        <div class="adv-body" id="advBody">
+            <button type="button" class="btn-ghost" id="btnSelect">选择映射点位 ▸</button>
+            <span class="summary" id="selSummary">已启用,尚未选择点位</span>
+        </div>
+    </section>
+
+    <!-- 操作区 -->
+    <section class="block actions">
+        <button type="button" class="btn-primary" id="btnGenerate">▶ 生成并下载</button>
+        <button type="button" class="btn-ghost" id="btnPreview">预览</button>
+        <button type="button" class="btn-ghost" id="btnClear">清空</button>
+    </section>
+
+    <!-- 日志 / 预览 -->
+    <section class="block log-block">
+        <div class="block-head"><span class="idx">05</span><h2>日志 / 预览</h2><span class="log-stripe"></span></div>
+        <pre class="log" id="log" spellcheck="false"></pre>
+    </section>
+
+</main>
+
+<footer class="footer">
+    <span>STATIC // NO BACKEND // FILES NEVER LEAVE BROWSER</span>
+    <span class="dim">BOM+CRLF · UTF-8 · TIA V18</span>
+</footer>
+
+<!-- 点位选择模态 -->
+<div class="modal-mask" id="modalMask" hidden>
+    <div class="modal">
+        <div class="modal-head">
+            <h3>选择映射点位</h3>
+            <button type="button" class="modal-close" id="modalClose">✕</button>
+        </div>
+        <div class="modal-tools">
+            <button type="button" class="btn-mini" data-sel="all">全选</button>
+            <button type="button" class="btn-mini" data-sel="none">全不选</button>
+            <button type="button" class="btn-mini" data-sel="input">仅输入 %I</button>
+            <button type="button" class="btn-mini" data-sel="output">仅输出 %Q</button>
+            <span class="modal-hint">M 点方向用下拉框选择</span>
+        </div>
+        <div class="modal-table-wrap">
+            <table class="modal-table" id="pointTable">
+                <thead>
+                    <tr>
+                        <th class="col-sel">映射</th>
+                        <th class="col-name">名称</th>
+                        <th class="col-addr">地址</th>
+                        <th class="col-type">类型</th>
+                        <th class="col-dir">方向</th>
+                    </tr>
+                </thead>
+                <tbody id="pointBody"></tbody>
+            </table>
+        </div>
+        <div class="modal-foot">
+            <button type="button" class="btn-primary small" id="modalOk">确定</button>
+            <button type="button" class="btn-ghost" id="modalCancel">取消</button>
+        </div>
+    </div>
+</div>
+
+<script src="js/utils.js"></script>
+<script src="js/parser.js"></script>
+<script src="js/generator.js"></script>
+<script src="js/downloader.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
