@@ -142,59 +142,94 @@ function genFbPokeBlk(points, fbName, dbName, dbNumber) {
         lines.push('');
     }
 
-    function safeCount(ioSpan, dbBytes) {
-        const cnt = Math.min(ioSpan, dbBytes);
-        let warn = null;
+    function isContinuousIo(pts) {
+        // 检测一组点的 IO 地址是否连续且无空洞,且与 DB 结构体字节数一致。
+        // 返回 { ok, reason }:ok=true 表示可用 POKE_BLK
+        if (!pts.length) return { ok: true, reason: null };
+        const span = byteSpan(pts);
+        if (!span) return { ok: false, reason: '无法解析地址' };
+        const ioSpan = span.max - span.min + 1;
+        const dbBytes = ceil8(pts.length);
         if (ioSpan !== dbBytes) {
-            warn = `IO地址跨度(${ioSpan}字节)与DB结构体(${dbBytes}字节)不匹配,块移动按 ${cnt} 字节,可能错位`;
+            return { ok: false, reason: `IO地址跨度(${ioSpan}字节)与DB结构体(${dbBytes}字节)不匹配` };
         }
-        return { cnt, warn };
+        // 检测地址连续性:点位数 == ioSpan * 8 表示无空洞
+        if (pts.length !== ioSpan * 8) {
+            return { ok: false, reason: `IO地址跨度内存在空洞(跨度${ioSpan}字节应含${ioSpan * 8}个点,实际${pts.length}个)` };
+        }
+        return { ok: true, reason: null };
+    }
+
+    function emitBitAssignment(groupName, pts, dbStructPath) {
+        // 输入型逐位赋值回退:物理点 -> DB
+        lines.push(`    // ===== ${groupName}:地址不连续,自动回退到逐位赋值 =====`);
+        pts.forEach(p => lines.push(`    ${fmtDbRef(dbName, dbStructPath, p.name)} := ${fmtPhys(p.name)};`));
+        lines.push('');
+    }
+
+    function emitBitAssignmentOutput(groupName, pts, dbStructPath) {
+        // 输出型逐位赋值回退:DB -> 物理点
+        lines.push(`    // ===== ${groupName}:地址不连续,自动回退到逐位赋值 =====`);
+        pts.forEach(p => lines.push(`    ${fmtPhys(p.name)} := ${fmtDbRef(dbName, dbStructPath, p.name)};`));
+        lines.push('');
     }
 
     // 输入区 -> DB 输入结构体
     if (inputs.length) {
-        const span = byteSpan(inputs);
-        if (span) {
+        const { ok, reason } = isContinuousIo(inputs);
+        if (ok) {
+            const span = byteSpan(inputs);
             const ioSpan = span.max - span.min + 1;
             const dbBytes = ceil8(inputs.length);
-            const { cnt, warn } = safeCount(ioSpan, dbBytes);
             emit(`输入块移动: %I${span.min}.0~%I${span.max}.7 (IO${ioSpan}字节,DB${dbBytes}字节) -> DB 输入结构体(偏移${inOff})`,
-                '16#81', 0, span.min, '16#84', 'dbNum', inOff, cnt, warn);
+                '16#81', 0, span.min, '16#84', 'dbNum', inOff, ioSpan, null);
+        } else {
+            lines.push(`    // ⚠ 输入组 POKE_BLK 不可用: ${reason}`);
+            emitBitAssignment('输入映射', inputs, '输入');
         }
     }
     // M点输入区 -> DB M点.输入
     if (mIn.length) {
-        const span = byteSpan(mIn);
-        if (span) {
+        const { ok, reason } = isContinuousIo(mIn);
+        if (ok) {
+            const span = byteSpan(mIn);
             const ioSpan = span.max - span.min + 1;
             const dbBytes = ceil8(mIn.length);
-            const { cnt, warn } = safeCount(ioSpan, dbBytes);
             const absOff = mStructOff + mInSubOff;
             emit(`M点输入块移动: %M${span.min}.0~%M${span.max}.7 (IO${ioSpan}字节,DB${dbBytes}字节) -> DB M点.输入(偏移${absOff})`,
-                '16#83', 0, span.min, '16#84', 'dbNum', absOff, cnt, warn);
+                '16#83', 0, span.min, '16#84', 'dbNum', absOff, ioSpan, null);
+        } else {
+            lines.push(`    // ⚠ M点输入组 POKE_BLK 不可用: ${reason}`);
+            emitBitAssignment('M点输入映射', mIn, 'M点.输入');
         }
     }
     // DB 输出结构体 -> 输出区
     if (outputs.length) {
-        const span = byteSpan(outputs);
-        if (span) {
+        const { ok, reason } = isContinuousIo(outputs);
+        if (ok) {
+            const span = byteSpan(outputs);
             const ioSpan = span.max - span.min + 1;
             const dbBytes = ceil8(outputs.length);
-            const { cnt, warn } = safeCount(ioSpan, dbBytes);
             emit(`输出块移动: DB 输出结构体(偏移${outOff}, DB${dbBytes}字节,IO${ioSpan}字节) -> %Q${span.min}.0~%Q${span.max}.7`,
-                '16#84', 'dbNum', outOff, '16#82', 0, span.min, cnt, warn);
+                '16#84', 'dbNum', outOff, '16#82', 0, span.min, ioSpan, null);
+        } else {
+            lines.push(`    // ⚠ 输出组 POKE_BLK 不可用: ${reason}`);
+            emitBitAssignmentOutput('输出映射', outputs, '输出');
         }
     }
     // DB M点.输出 -> M点输出区
     if (mOut.length) {
-        const span = byteSpan(mOut);
-        if (span) {
+        const { ok, reason } = isContinuousIo(mOut);
+        if (ok) {
+            const span = byteSpan(mOut);
             const ioSpan = span.max - span.min + 1;
             const dbBytes = ceil8(mOut.length);
-            const { cnt, warn } = safeCount(ioSpan, dbBytes);
             const absOff = mStructOff + mOutSubOff;
             emit(`M点输出块移动: DB M点.输出(偏移${absOff}, DB${dbBytes}字节,IO${ioSpan}字节) -> %M${span.min}.0~%M${span.max}.7`,
-                '16#84', 'dbNum', absOff, '16#83', 0, span.min, cnt, warn);
+                '16#84', 'dbNum', absOff, '16#83', 0, span.min, ioSpan, null);
+        } else {
+            lines.push(`    // ⚠ M点输出组 POKE_BLK 不可用: ${reason}`);
+            emitBitAssignmentOutput('M点输出映射', mOut, 'M点.输出');
         }
     }
 
